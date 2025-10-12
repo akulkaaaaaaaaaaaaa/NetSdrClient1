@@ -35,7 +35,69 @@ public class NetSdrClientTests
 
         _client = new NetSdrClient(_tcpMock.Object, _updMock.Object);
     }
+    // 1. Покриття StopIQAsync() при відсутності з’єднання
+    [Test]
+    public async Task StopIQAsync_NoActiveConnection_PrintsMessage()
+    {
+        // Arrange
+        _tcpMock.Setup(tcp => tcp.Connected).Returns(false);
+        using var sw = new StringWriter();
+        Console.SetOut(sw);
 
+        // Act
+        await _client.StopIQAsync();
+
+        // Assert
+        string output = sw.ToString().Trim();
+        Assert.That(output, Does.Contain("No active connection."));
+    }
+
+    //  2. Покриття ChangeFrequencyAsync()
+    [Test]
+    public async Task ChangeFrequencyAsync_SendsTcpRequest()
+    {
+        // Arrange
+        _tcpMock.Setup(tcp => tcp.Connected).Returns(true);
+        await _client.ConnectAsync();
+        long hz = 7000000;
+        int channel = 2;
+
+        // Act
+        await _client.ChangeFrequencyAsync(hz, channel);
+
+        // Assert
+        _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.AtLeastOnce);
+    }
+
+    //  3. Покриття _udpClient_MessageReceived()
+    [Test]
+    public void UdpClient_MessageReceived_WritesSamplesToFile()
+    {
+        // Arrange
+        string testFile = "samples.bin";
+        if (File.Exists(testFile))
+            File.Delete(testFile);
+
+        var sampleData = new byte[] { 0x01, 0x02, 0x03, 0x04 };
+
+        // ⚠️ Підміняємо поведінку NetSdrMessageHelper, якщо можна через static mocking
+        // Якщо ні — просто перевіримо факт створення файлу та вивід у консоль
+        using var sw = new StringWriter();
+        Console.SetOut(sw);
+
+        // Act
+        typeof(NetSdrClient)
+            .GetMethod("_udpClient_MessageReceived", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+            ?.Invoke(null, new object?[] { null, sampleData });
+
+        // Assert
+        string output = sw.ToString();
+        Assert.That(output, Does.Contain("Samples recieved"));
+        Assert.That(File.Exists(testFile), Is.True);
+
+        // Clean up
+        File.Delete(testFile);
+    }
     [Test]
     public async Task ConnectAsyncTest()
     {
