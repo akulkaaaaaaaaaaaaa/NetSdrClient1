@@ -45,7 +45,7 @@ public class UdpClientWrapper : IUdpClient
         }
     }
 
-    public void StopListening()
+    private void StopInternal()
     {
         try
         {
@@ -60,19 +60,14 @@ public class UdpClientWrapper : IUdpClient
         }
     }
 
+    public void StopListening()
+    {
+        StopInternal();
+    }
+
     public void Exit()
     {
-        try
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _udpClient?.Close();
-            Console.WriteLine("Stopped listening for UDP messages.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error while stopping: {ex.Message}");
-        }
+        StopInternal();
     }
 
     public override int GetHashCode()
