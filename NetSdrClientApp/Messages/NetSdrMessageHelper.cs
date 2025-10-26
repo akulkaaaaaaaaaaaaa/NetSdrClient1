@@ -15,7 +15,7 @@ namespace NetSdrClientApp.Messages
         private const short _msgHeaderLength = 2; //2 byte, 16 bit
         private const short _msgControlItemLength = 2; //2 byte, 16 bit
         private const short _msgSequenceNumberLength = 2; //2 byte, 16 bit
-
+        
         public enum MsgTypes
         {
             SetControlItem,
@@ -40,6 +40,8 @@ namespace NetSdrClientApp.Messages
 
         public static byte[] GetControlItemMessage(MsgTypes type, ControlItemCodes itemCode, byte[] parameters)
         {
+            // Навмисне порушення — створюємо залежність Messages → Networking
+            var _ = typeof(NetSdrClientApp.Networking.ITcpClient);
             return GetMessage(type, itemCode, parameters);
         }
 
