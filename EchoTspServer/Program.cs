@@ -13,6 +13,9 @@ namespace EchoServer
         private TcpListener _listener;
         private CancellationTokenSource _cancellationTokenSource;
 
+        // Actual listening port (useful when constructed with port 0)
+        public int ListeningPort { get; private set; }
+
         //constuctor
         public EchoServer(int port)
         {
@@ -24,6 +27,7 @@ namespace EchoServer
         {
             _listener = new TcpListener(IPAddress.Any, _port);
             _listener.Start();
+            ListeningPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
             Console.WriteLine($"Server started on port {_port}.");
 
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
@@ -35,9 +39,9 @@ namespace EchoServer
 
                     _ = Task.Run(() => HandleClientAsync(client, _cancellationTokenSource.Token));
                 }
-                catch (ObjectDisposedException)
+                catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
                 {
-                    // Listener has been closed
+                    // Listener has been closed or socket aborted (likely due to Stop())
                     break;
                 }
             }
