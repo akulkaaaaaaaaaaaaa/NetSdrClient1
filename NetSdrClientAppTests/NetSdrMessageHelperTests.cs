@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
-using NUnit.Framework;
 using NetSdrClientApp.Messages;
+using NUnit.Framework;
 
 namespace NetSdrClientAppTests
 {
