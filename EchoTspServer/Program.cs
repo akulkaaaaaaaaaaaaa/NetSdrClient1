@@ -10,17 +10,19 @@ namespace EchoServer
     public class EchoServer
     {
         private readonly int _port;
-        private TcpListener _listener;
+        private TcpListener? _listener;
         private CancellationTokenSource _cancellationTokenSource;
 
         // Actual listening port (useful when constructed with port 0)
         public int ListeningPort { get; private set; }
+        private readonly IStreamProcessor _streamProcessor;
 
-        //constuctor
-        public EchoServer(int port)
+        //constructor
+        public EchoServer(int port, IStreamProcessor? streamProcessor = null)
         {
             _port = port;
             _cancellationTokenSource = new CancellationTokenSource();
+            _streamProcessor = streamProcessor ?? new EchoStreamProcessor();
         }
 
         public async Task StartAsync()
@@ -55,15 +57,7 @@ namespace EchoServer
             {
                 try
                 {
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
-
-                    while (!token.IsCancellationRequested && (bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
-                    {
-                        // Echo back the received message
-                        await stream.WriteAsync(buffer, 0, bytesRead, token);
-                        Console.WriteLine($"Echoed {bytesRead} bytes to the client.");
-                    }
+                    await _streamProcessor.ProcessAsync(stream, stream, token);
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException))
                 {
@@ -80,7 +74,7 @@ namespace EchoServer
         public void Stop()
         {
             _cancellationTokenSource.Cancel();
-            _listener.Stop();
+            _listener?.Stop();
             _cancellationTokenSource.Dispose();
             Console.WriteLine("Server stopped.");
         }
@@ -120,7 +114,7 @@ namespace EchoServer
         private readonly string _host;
         private readonly int _port;
         private readonly UdpClient _udpClient;
-        private Timer _timer;
+        private Timer? _timer;
 
         public UdpTimedSender(string host, int port)
         {
@@ -134,12 +128,12 @@ namespace EchoServer
             if (_timer != null)
                 throw new InvalidOperationException("Sender is already running.");
 
-            _timer = new Timer(SendMessageCallback, null, 0, intervalMilliseconds);
+            _timer = new Timer(SendMessageCallback, state: null, dueTime: 0, period: intervalMilliseconds);
         }
 
         ushort i = 0;
 
-        private void SendMessageCallback(object state)
+        private void SendMessageCallback(object? state)
         {
             try
             {
