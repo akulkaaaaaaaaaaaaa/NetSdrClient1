@@ -28,11 +28,12 @@
 
 name: SonarCloud analysis
 
+
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "lab6" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "lab6" ]
   workflow_dispatch:
 
 permissions:
@@ -70,12 +71,18 @@ jobs:
         run: dotnet restore NetSdrClient.sln
       - name: Build
         run: dotnet build NetSdrClient.sln -c Release --no-restore
-      - name: Tests with coverage (OpenCover)
+      - name: Tests with coverage (OpenCover) for all test projects
         run: |
-          dotnet test NetSdrClientAppTests/NetSdrClientAppTests.csproj -c Release --no-build `
-            /p:CollectCoverage=true `
-            /p:CoverletOutput=TestResults/coverage.xml `
-            /p:CoverletOutputFormat=opencover
+          # find all test projects and run them with coverage enabled
+          $tests = Get-ChildItem -Path . -Recurse -Filter "*Tests.csproj" | Select-Object -ExpandProperty FullName
+          foreach ($t in $tests) {
+            $projName = Split-Path $t -Leaf | ForEach-Object { $_ -replace '\\..*', '' }
+            $out = "TestResults/$([IO.Path]::GetFileNameWithoutExtension($t))_coverage.xml"
+            dotnet test $t -c Release --no-build `
+              /p:CollectCoverage=true `
+              /p:CoverletOutput=$out `
+              /p:CoverletOutputFormat=opencover
+          }
         shell: pwsh
       # 3) END: SonarScanner
       - name: SonarScanner End
