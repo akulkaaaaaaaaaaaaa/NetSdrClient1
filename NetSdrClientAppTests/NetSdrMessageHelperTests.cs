@@ -12,15 +12,17 @@ namespace NetSdrClientAppTests
         {
         }
 
+        // ------------------- Tests for GetControlItemMessage -------------------
+
         [Test]
         public void GetControlItemMessageTest()
         {
-            //Arrange
+            // Arrange
             var type = NetSdrMessageHelper.MsgTypes.Ack;
             var code = NetSdrMessageHelper.ControlItemCodes.ReceiverState;
             int parametersLength = 7500;
 
-            //Act
+            // Act
             byte[] msg = NetSdrMessageHelper.GetControlItemMessage(type, code, new byte[parametersLength]);
 
             var headerBytes = msg.Take(2);
@@ -32,22 +34,24 @@ namespace NetSdrClientAppTests
             var actualLength = num - ((int)actualType << 13);
             var actualCode = BitConverter.ToInt16(codeBytes.ToArray());
 
-            //Assert
+            // Assert
             Assert.That(headerBytes.Count(), Is.EqualTo(2));
             Assert.That(msg.Length, Is.EqualTo(actualLength));
-            Assert.That(type, Is.EqualTo(actualType));
+            Assert.That(actualType, Is.EqualTo(type));
             Assert.That(actualCode, Is.EqualTo((short)code));
             Assert.That(parametersBytes.Count(), Is.EqualTo(parametersLength));
         }
 
+        // ------------------- Tests for GetDataItemMessage -------------------
+
         [Test]
         public void GetDataItemMessageTest()
         {
-            //Arrange
+            // Arrange
             var type = NetSdrMessageHelper.MsgTypes.DataItem2;
             int parametersLength = 7500;
 
-            //Act
+            // Act
             byte[] msg = NetSdrMessageHelper.GetDataItemMessage(type, new byte[parametersLength]);
 
             var headerBytes = msg.Take(2);
@@ -57,14 +61,15 @@ namespace NetSdrClientAppTests
             var actualType = (NetSdrMessageHelper.MsgTypes)(num >> 13);
             var actualLength = num - ((int)actualType << 13);
 
-            //Assert
+            // Assert
             Assert.That(headerBytes.Count(), Is.EqualTo(2));
             Assert.That(msg.Length, Is.EqualTo(actualLength));
-            Assert.That(type, Is.EqualTo(actualType));
+            Assert.That(actualType, Is.EqualTo(type));
             Assert.That(parametersBytes.Count(), Is.EqualTo(parametersLength));
         }
 
-        // ------------------- Тести для GetSamples -------------------
+        // ------------------- Tests for GetSamples -------------------
+
         [Test]
         public void GetSamples_ReturnsCorrectValues_For8bitSamples()
         {
@@ -73,11 +78,11 @@ namespace NetSdrClientAppTests
 
             var samples = NetSdrMessageHelper.GetSamples(sampleSize, body).ToArray();
 
-            Assert.AreEqual(4, samples.Length);
-            Assert.AreEqual(1, samples[0]);
-            Assert.AreEqual(2, samples[1]);
-            Assert.AreEqual(3, samples[2]);
-            Assert.AreEqual(4, samples[3]);
+            Assert.That(samples.Length, Is.EqualTo(4));
+            Assert.That(samples[0], Is.EqualTo(1));
+            Assert.That(samples[1], Is.EqualTo(2));
+            Assert.That(samples[2], Is.EqualTo(3));
+            Assert.That(samples[3], Is.EqualTo(4));
         }
 
         [Test]
@@ -88,9 +93,9 @@ namespace NetSdrClientAppTests
 
             var samples = NetSdrMessageHelper.GetSamples(sampleSize, body).ToArray();
 
-            Assert.AreEqual(2, samples.Length);
-            Assert.AreEqual(1, samples[0]);
-            Assert.AreEqual(2, samples[1]);
+            Assert.That(samples.Length, Is.EqualTo(2));
+            Assert.That(samples[0], Is.EqualTo(1));
+            Assert.That(samples[1], Is.EqualTo(2));
         }
 
         [Test]
@@ -101,9 +106,9 @@ namespace NetSdrClientAppTests
 
             var samples = NetSdrMessageHelper.GetSamples(sampleSize, body).ToArray();
 
-            Assert.AreEqual(2, samples.Length);
-            Assert.AreEqual(BitConverter.ToInt32(new byte[] { 1, 2, 3, 0 }, 0), samples[0]);
-            Assert.AreEqual(BitConverter.ToInt32(new byte[] { 4, 5, 6, 0 }, 0), samples[1]);
+            Assert.That(samples.Length, Is.EqualTo(2));
+            Assert.That(samples[0], Is.EqualTo(BitConverter.ToInt32(new byte[] { 1, 2, 3, 0 }, 0)));
+            Assert.That(samples[1], Is.EqualTo(BitConverter.ToInt32(new byte[] { 4, 5, 6, 0 }, 0)));
         }
 
         [Test]
