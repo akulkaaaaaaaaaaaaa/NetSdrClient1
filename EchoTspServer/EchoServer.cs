@@ -1,20 +1,22 @@
-using System;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace EchoServer
+namespace EchoTspServer
 {
+    // Основний TCP-сервер, який приймає клієнтів і делегує їх обробку IClientHandler.
     public class EchoServer
     {
         private readonly ITcpListener _listener;
+        private readonly IClientHandler _clientHandler;
         private readonly ILogger _logger;
-        private readonly CancellationTokenSource _cts = new();
+        private CancellationTokenSource _cts;
 
-        public EchoServer(ITcpListener listener, ILogger logger)
+        public EchoServer(ITcpListener listener, IClientHandler clientHandler, ILogger logger)
         {
             _listener = listener;
+            _clientHandler = clientHandler;
             _logger = logger;
+            _cts = new CancellationTokenSource();
         }
 
         public async Task StartAsync()
@@ -22,63 +24,29 @@ namespace EchoServer
             _listener.Start();
             _logger.Log("Server started.");
 
-            try
-            {
-                while (!_cts.IsCancellationRequested)
-                {
-                    TcpClient client = await _listener.AcceptTcpClientAsync();
-                    _logger.Log("Client connected.");
-
-                    _ = Task.Run(() => HandleClientAsync(client, _cts.Token));
-                }
-            }
-            catch (ObjectDisposedException)
-            {
-                // listener stopped
-            }
-            catch (OperationCanceledException)
-            {
-                // normal stop
-            }
-            finally
-            {
-                _listener.Stop();
-                _logger.Log("Server shutdown.");
-            }
-        }
-
-        private async Task HandleClientAsync(TcpClient client, CancellationToken token)
-        {
-            using (NetworkStream stream = client.GetStream())
+            while (!_cts.Token.IsCancellationRequested)
             {
                 try
                 {
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
+                    var client = await _listener.AcceptTcpClientAsync();
+                    _logger.Log("Client connected.");
 
-                    while (!token.IsCancellationRequested &&
-                           (bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
-                    {
-                        await stream.WriteAsync(buffer, 0, bytesRead, token);
-                        _logger.Log($"Echoed {bytesRead} bytes to the client.");
-                    }
+                    _ = Task.Run(() => _clientHandler.HandleClientAsync(client, _cts.Token));
                 }
-                catch (Exception ex) when (!(ex is OperationCanceledException))
+                catch
                 {
-                    _logger.Log($"Error: {ex.Message}");
-                }
-                finally
-                {
-                    client.Close();
-                    _logger.Log("Client disconnected.");
+                    // Stop / cancel / disposed – виходимо з циклу
+                    break;
                 }
             }
+
+            _logger.Log("Server stopped.");
         }
 
         public void Stop()
         {
-            _logger.Log("Server stop requested.");
             _cts.Cancel();
+            _listener.Stop();
         }
     }
 }

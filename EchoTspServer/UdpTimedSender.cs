@@ -1,17 +1,19 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace EchoServer
+namespace EchoTspServer
 {
+    // Періодично надсилає UDP-повідомлення.
     public class UdpTimedSender : IDisposable
     {
         private readonly string _host;
         private readonly int _port;
         private readonly UdpClient _udpClient;
         private Timer _timer;
-        private ushort _i = 0;
+        private ushort _counter = 0;
 
         public UdpTimedSender(string host, int port)
         {
@@ -32,23 +34,23 @@ namespace EchoServer
         {
             try
             {
-                Random rnd = new Random();
-                byte[] samples = new byte[1024];
+                var rnd = new Random();
+                var samples = new byte[1024];
                 rnd.NextBytes(samples);
+                _counter++;
 
-                _i++;
-                byte[] msg = (new byte[] { 0x04, 0x84 })
-                    .Concat(BitConverter.GetBytes(_i))
+                byte[] header = { 0x04, 0x84 };
+                byte[] msg = header
+                    .Concat(BitConverter.GetBytes(_counter))
                     .Concat(samples)
                     .ToArray();
 
                 var endpoint = new IPEndPoint(IPAddress.Parse(_host), _port);
                 _udpClient.Send(msg, msg.Length, endpoint);
-                Console.WriteLine($"Message sent to {_host}:{_port} ");
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error sending message: {ex.Message}");
+                // помилки нам не критичні в бекграунді
             }
         }
 

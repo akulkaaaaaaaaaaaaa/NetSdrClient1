@@ -1,42 +1,31 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace EchoServer
+namespace EchoTspServer
 {
     public class Program
     {
         public static async Task Main(string[] args)
         {
-            int tcpPort = 5000;
-            string host = "127.0.0.1";
-            int udpPort = 60000;
-            int intervalMilliseconds = 5000;
+            var listener = new DefaultTcpListener(5000);
+            var handler  = new EchoClientHandler();
+            var logger   = new ConsoleLogger();
 
-            var logger = new ConsoleLogger();
-            var listener = new DefaultTcpListener(tcpPort);
-            var server = new EchoServer(listener, logger);
+            var server = new EchoServer(listener, handler, logger);
 
-            // Запускаємо сервер асинхронно
-            _ = Task.Run(() => server.StartAsync());
+            // Запускаємо сервер у фоні
+            var serverTask = server.StartAsync();
 
-            using (var sender = new UdpTimedSender(host, udpPort))
-            {
-                Console.WriteLine("Press any key to stop sending...");
-                sender.StartSending(intervalMilliseconds);
+            // Запускаємо UDP-відправник
+            using var sender = new UdpTimedSender("127.0.0.1", 60000);
+            sender.StartSending(3000);
 
-                Console.WriteLine("Press 'q' to quit...");
-                while (Console.ReadKey(intercept: true).Key != ConsoleKey.Q)
-                {
-                    // чекаємо на 'q'
-                }
+            Console.WriteLine("Press 'Q' to stop...");
+            while (Console.ReadKey(true).Key != ConsoleKey.Q) { }
 
-                sender.StopSending();
-                server.Stop();
-                Console.WriteLine("Sender stopped.");
-            }
-
-            // Невелика пауза, щоб сервер коректно зупинився
-            await Task.Delay(500);
+            sender.StopSending();
+            server.Stop();
+            await serverTask;
         }
     }
 }

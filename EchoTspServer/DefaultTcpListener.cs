@@ -1,9 +1,17 @@
+// DefaultTcpListener.cs
+// -----------------------------
+// Real system-level implementation of ITcpListener.
+// Wrapped into an abstraction to enable mocking in tests.
+// Without this wrapper, EchoServer would depend directly on TcpListener
+// and be impossible to test without opening real sockets.
+
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace EchoServer
+namespace EchoTspServer
 {
+    // Реальна обгортка над TcpListener.
     public class DefaultTcpListener : ITcpListener
     {
         private readonly TcpListener _listener;
@@ -14,7 +22,11 @@ namespace EchoServer
         }
 
         public void Start() => _listener.Start();
+
         public void Stop() => _listener.Stop();
-        public Task<TcpClient> AcceptTcpClientAsync() => _listener.AcceptTcpClientAsync();
+
+        // Delegates to the real TcpListener but stays mockable for tests
+        public Task<TcpClient> AcceptTcpClientAsync() =>
+            _listener.AcceptTcpClientAsync();
     }
 }
