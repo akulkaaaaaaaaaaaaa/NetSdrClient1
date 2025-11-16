@@ -6,7 +6,8 @@ namespace EchoServerTests
     [TestFixture]
     public class ProgramTests
     {
-        [Test]
+        [Test, Timeout(2000)]
+
         public void Program_Class_Exists()
         {
             // Просто перевіряємо, що тип інціалізується.
