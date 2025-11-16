@@ -6,12 +6,20 @@ namespace EchoServerTests
     [TestFixture]
     public class ProgramTests
     {
-        [Test, Timeout(2000)]
-
+        [Test]
         public void Program_Class_Exists()
         {
-            // Просто перевіряємо, що тип інціалізується.
             Assert.IsNotNull(typeof(Program));
         }
+
+        [Test]
+        public void Main_HasCorrectSignature()
+        {
+            var method = typeof(Program).GetMethod("Main");
+
+            Assert.IsNotNull(method, "Main method not found");
+            Assert.AreEqual(typeof(Task), method.ReturnType, "Main() must return Task");
+        }
+        
     }
 }
