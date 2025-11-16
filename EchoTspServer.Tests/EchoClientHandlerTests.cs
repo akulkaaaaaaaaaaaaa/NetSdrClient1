@@ -11,36 +11,40 @@ namespace EchoServerTests
     public class EchoClientHandlerTests
     {
         [Test]
-        public async Task HandleClientAsync_EchoesBackData()
+        public async Task HandleClientAsync_EchoesBackData_Fast()
         {
+            using var s1 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            using var s2 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            // Створюємо "віртуальний конект" між сокетами
+            var ep = new IPEndPoint(IPAddress.Loopback, 0);
+            var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            listener.Bind(ep);
+            listener.Listen(1);
+
+            var port = ((IPEndPoint)listener.LocalEndPoint).Port;
+
+            var connectTask = s1.ConnectAsync(IPAddress.Loopback, port);
+            var acceptTask  = listener.AcceptAsync();
+
+            await Task.WhenAll(connectTask, acceptTask);
+
+            var serverClient = acceptTask.Result;
             var handler = new EchoClientHandler();
 
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-
-            var client = new TcpClient();
-            var connectTask = client.ConnectAsync("127.0.0.1", port);
-            var serverClient = await listener.AcceptTcpClientAsync();
-            await connectTask;
-
-            var handlerTask = handler.HandleClientAsync(serverClient, CancellationToken.None);
+            var handlerTask = handler.HandleClientAsync(new TcpClient { Client = serverClient }, CancellationToken.None);
 
             byte[] sendData = { 1, 2, 3, 4 };
-            var clientStream = client.GetStream();
-            await clientStream.WriteAsync(sendData, 0, sendData.Length);
+            await s1.SendAsync(sendData);
 
             byte[] buffer = new byte[4];
-            int read = await clientStream.ReadAsync(buffer, 0, buffer.Length);
+            int read = await s1.ReceiveAsync(buffer);
 
             Assert.AreEqual(4, read);
-            Assert.AreEqual(sendData[0], buffer[0]);
-            Assert.AreEqual(sendData[1], buffer[1]);
-            Assert.AreEqual(sendData[2], buffer[2]);
-            Assert.AreEqual(sendData[3], buffer[3]);
+            Assert.That(buffer, Is.EqualTo(sendData));
 
-            client.Close();
-            listener.Stop();
+            listener.Close();
         }
     }
 }
