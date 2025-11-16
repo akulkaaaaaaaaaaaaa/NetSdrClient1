@@ -70,14 +70,17 @@ jobs:
         run: dotnet restore NetSdrClient.sln
       - name: Build
         run: dotnet build NetSdrClient.sln -c Release --no-restore
-      - name: Tests with coverage (OpenCover)
+        # TEST 1 — NetSdrClientAppTests
+      - name: Run tests (App)
         run: |
           dotnet test NetSdrClientAppTests/NetSdrClientAppTests.csproj -c Release --no-build `
             /p:CollectCoverage=true `
-            /p:CoverletOutput=TestResults/coverage.xml `
-            /p:CoverletOutputFormat=opencover      
+            /p:CoverletOutput=TestResults/coverage_app.xml `
+            /p:CoverletOutputFormat=opencover
         shell: pwsh
-      - name: Run tests (EchoTspServer.Tests)
+
+      # TEST 2 — EchoTspServer.Tests
+      - name: Run tests (EchoServer)
         run: |
           dotnet test EchoTspServer.Tests/EchoServer.Tests.csproj -c Release --no-build `
             /p:CollectCoverage=true `
