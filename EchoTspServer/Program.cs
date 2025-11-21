@@ -3,8 +3,9 @@ using System.Threading.Tasks;
 
 namespace EchoTspServer
 {
-    public class Program
+    public static class Program
     {
+
         public static async Task Main(string[] args)
         {
             var listener = new DefaultTcpListener(5000);
@@ -21,7 +22,9 @@ namespace EchoTspServer
             sender.StartSending(3000);
 
             Console.WriteLine("Press 'Q' to stop...");
-            while (Console.ReadKey(true).Key != ConsoleKey.Q) { }
+            while (Console.ReadKey(true).Key != ConsoleKey.Q) 
+            { 
+            }
 
             sender.StopSending();
             server.Stop();
