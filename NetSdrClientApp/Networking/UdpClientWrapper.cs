@@ -82,11 +82,20 @@ namespace NetSdrClientApp.Networking
         public override int GetHashCode()
         {
             var payload = $"{nameof(UdpClientWrapper)}|{_localEndPoint.Address}|{_localEndPoint.Port}";
-            var data = Encoding.UTF8.GetBytes(payload);
-
-            // Prefer static SHA256.HashData - compliant with Sonar recommendation
-            var hash = SHA256.HashData(data);
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
             return BitConverter.ToInt32(hash, 0);
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (ReferenceEquals(this, obj))
+                return true;
+
+            if (obj is not UdpClientWrapper other)
+                return false;
+
+            return _localEndPoint.Address.Equals(other._localEndPoint.Address)
+                && _localEndPoint.Port == other._localEndPoint.Port;
         }
 
         private void ThrowIfDisposed()
@@ -107,7 +116,6 @@ namespace NetSdrClientApp.Networking
 
             if (disposing)
             {
-                // release managed resources
                 StopInternal();
             }
         }
