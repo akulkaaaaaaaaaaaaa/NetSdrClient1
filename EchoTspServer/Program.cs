@@ -22,9 +22,12 @@ namespace EchoTspServer
             sender.StartSending(3000);
 
             Console.WriteLine("Press 'Q' to stop...");
-            while (Console.ReadKey(true).Key != ConsoleKey.Q) 
-            { 
-            }
+            // Read keys until user presses Q. Use an explicit loop body to avoid an empty block.
+            ConsoleKey key;
+            do
+            {
+                key = Console.ReadKey(true).Key;
+            } while (key != ConsoleKey.Q);
 
             sender.StopSending();
             server.Stop();
