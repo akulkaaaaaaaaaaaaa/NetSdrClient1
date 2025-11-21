@@ -56,15 +56,24 @@ namespace NetSdrClientApp.Networking
         {
             if (Connected)
             {
-                _cts?.Cancel();
-                _cts?.Dispose();
-                _stream?.Close();
-                _tcpClient?.Close();
-
-                _cts = null!;
-                _tcpClient = null;
-                _stream = null;
-                Console.WriteLine("Disconnected.");
+                try
+                {
+                    _cts?.Cancel();
+                    _stream?.Close();
+                    _tcpClient?.Close();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // ignore dispose races
+                }
+                finally
+                {
+                    try { _cts?.Dispose(); } catch { }
+                    _cts = null;
+                    _tcpClient = null;
+                    _stream = null;
+                    Console.WriteLine("Disconnected.");
+                }
             }
             else
             {
@@ -118,7 +127,11 @@ namespace NetSdrClientApp.Networking
                 }
                 catch (OperationCanceledException)
                 {
-                    //empty
+                    // cancellation — expected on disconnect
+                }
+                catch (ObjectDisposedException)
+                {
+                    // stream or token disposed during shutdown — ignore
                 }
                 catch (Exception ex)
                 {
