@@ -1,10 +1,10 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace EchoTspServer
 {
-    // Основний TCP-сервер, який приймає клієнтів і делегує їх обробку IClientHandler.
-    public class EchoServer
+    public class EchoServer : IDisposable
     {
         private readonly ITcpListener _listener;
         private readonly IClientHandler _clientHandler;
@@ -35,7 +35,6 @@ namespace EchoTspServer
                 }
                 catch
                 {
-                    // Stop / cancel / disposed – виходимо з циклу
                     break;
                 }
             }
@@ -47,6 +46,12 @@ namespace EchoTspServer
         {
             _cts.Cancel();
             _listener.Stop();
+        }
+
+        public void Dispose()
+        {
+            _cts.Cancel();
+            _cts.Dispose();
         }
     }
 }
