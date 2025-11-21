@@ -57,10 +57,7 @@ namespace NetSdrClientAppTests
         [Test]
         public void UdpClientMessageReceived_WritesSamplesFile()
         {
-            // Prepare a small samples body for 16-bit samples: two samples 0x0102 and 0x0304.
-            // For DataItem messages TranslateMessage expects a 2-byte sequence number before the body,
-            // so prefix parameters with a 2-byte seqnum (e.g. 0x0001).
-            var body = new byte[] { 0x01, 0x00, 0x02, 0x01, 0x04, 0x03 }; // seq + two 16-bit samples (little-endian)
+            var body = new byte[] { 0x01, 0x00, 0x02, 0x01, 0x04, 0x03 };
             var msg = NetSdrMessageHelper.GetDataItemMessage(NetSdrMessageHelper.MsgTypes.DataItem0, body);
 
             var samplesFile = Path.Combine(Directory.GetCurrentDirectory(), "samples.bin");
@@ -70,12 +67,12 @@ namespace NetSdrClientAppTests
             method.Invoke(null, new object?[] { null, msg });
 
             Assert.That(File.Exists(samplesFile), Is.True);
+
             var data = File.ReadAllBytes(samplesFile);
 
             // Two samples written as 16-bit shorts => 4 bytes
-            Assert.That(data.Length, Is.GreaterThanOrEqualTo(4));
+            Assert.That(data, Has.Length.GreaterThanOrEqualTo(4));
 
-            // cleanup
             File.Delete(samplesFile);
         }
     }
