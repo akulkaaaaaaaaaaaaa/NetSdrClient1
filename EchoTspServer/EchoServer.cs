@@ -9,7 +9,7 @@ namespace EchoTspServer
         private readonly ITcpListener _listener;
         private readonly IClientHandler _clientHandler;
         private readonly ILogger _logger;
-        private CancellationTokenSource _cts;
+        private readonly CancellationTokenSource _cts;
 
         public EchoServer(ITcpListener listener, IClientHandler clientHandler, ILogger logger)
         {
@@ -50,8 +50,9 @@ namespace EchoTspServer
 
         public void Dispose()
         {
-            _cts.Cancel();
-            _cts.Dispose();
+            _cts?.Cancel();
+            _cts?.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }
