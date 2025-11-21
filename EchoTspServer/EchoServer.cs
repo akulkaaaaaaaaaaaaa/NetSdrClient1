@@ -11,6 +11,8 @@ namespace EchoTspServer
         private readonly ILogger _logger;
         private readonly CancellationTokenSource _cts;
 
+        private bool _disposed;
+
         public EchoServer(ITcpListener listener, IClientHandler clientHandler, ILogger logger)
         {
             _listener = listener;
@@ -44,14 +46,39 @@ namespace EchoTspServer
 
         public void Stop()
         {
+            if (_disposed) return;
+
             _cts.Cancel();
             _listener.Stop();
         }
 
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            if (disposing)
+            {
+                // managed resources cleanup
+                Stop();
+                _cts?.Dispose();
+
+                if (_listener is IDisposable disposableListener)
+                    disposableListener.Dispose();
+
+                if (_clientHandler is IDisposable disposableHandler)
+                    disposableHandler.Dispose();
+
+                if (_logger is IDisposable disposableLogger)
+                    disposableLogger.Dispose();
+            }
+
+            // no unmanaged resources -> nothing here
+        }
+
         public void Dispose()
         {
-            _cts?.Cancel();
-            _cts?.Dispose();
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
     }

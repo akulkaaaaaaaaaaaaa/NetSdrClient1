@@ -15,6 +15,8 @@ namespace EchoTspServer
         private Timer? _timer;
         private ushort _counter = 0;
 
+        private bool _disposed;
+
         public UdpTimedSender(string host, int port)
         {
             _host = host;
@@ -57,13 +59,30 @@ namespace EchoTspServer
         public void StopSending()
         {
             _timer?.Dispose();
-            _timer = null!;
+            _timer = null;
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            if (disposing)
+            {
+                // звільняємо керовані ресурси
+                StopSending();
+                _udpClient.Dispose();
+            }
+
+            // unmanaged resources — немає
         }
 
         public void Dispose()
         {
-            StopSending();
-            _udpClient.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
     }
 }

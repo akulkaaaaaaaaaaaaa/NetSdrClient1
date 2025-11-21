@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.PortableExecutable;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace NetSdrClientApp.Messages
 {
@@ -106,27 +103,48 @@ namespace NetSdrClientApp.Messages
             return success;
         }
 
-        public static IEnumerable<int> GetSamples(ushort sampleSize, byte[] body)
+        //****************************************************************************************************
+        // Split method: validation + iterator
+        //****************************************************************************************************
+
+        public static IEnumerable<int> GetSamples(ushort sampleSizeBits, byte[] body)
         {
-            sampleSize /= 8; //to bytes
-            if (sampleSize  > 4)
-            {
-                throw new ArgumentOutOfRangeException();
-            }
+            ValidateSampleSize(sampleSizeBits);
+            int byteSize = sampleSizeBits / 8;
+            return IterateSamples(body, byteSize);
+        }
 
-            var bodyEnumerable = body as IEnumerable<byte>;
-            var prefixBytes = Enumerable.Range(0, 4 - sampleSize)
-                                      .Select(b => (byte)0);
+        private static void ValidateSampleSize(ushort sampleSizeBits)
+        {
+            if (sampleSizeBits < 8 || sampleSizeBits > 32)
+                throw new ArgumentOutOfRangeException(nameof(sampleSizeBits),
+                    "Sample size must be between 8 and 32 bits.");
 
-            while (bodyEnumerable.Count() >= sampleSize)
+            if (sampleSizeBits % 8 != 0)
+                throw new ArgumentOutOfRangeException(nameof(sampleSizeBits),
+                    "Sample size must be divisible by 8 (bit-aligned).");
+        }
+
+        private static IEnumerable<int> IterateSamples(byte[] body, int sampleSizeBytes)
+        {
+            var bodyEnumerable = body.AsEnumerable();
+            var prefixBytes = Enumerable.Range(0, 4 - sampleSizeBytes)
+                                        .Select(_ => (byte)0);
+
+            while (bodyEnumerable.Take(sampleSizeBytes).Any())
             {
-                yield return BitConverter.ToInt32(bodyEnumerable
-                    .Take(sampleSize)
-                    .Concat(prefixBytes)
-                    .ToArray());
-                bodyEnumerable = bodyEnumerable.Skip(sampleSize);
+                yield return BitConverter.ToInt32(
+                    bodyEnumerable.Take(sampleSizeBytes)
+                                  .Concat(prefixBytes)
+                                  .ToArray());
+
+                bodyEnumerable = bodyEnumerable.Skip(sampleSizeBytes);
             }
         }
+
+        //****************************************************************************************************
+        // Header Operations
+        //****************************************************************************************************
 
         private static byte[] GetHeader(MsgTypes type, int msgLength)
         {
@@ -140,7 +158,7 @@ namespace NetSdrClientApp.Messages
 
             if (msgLength < 0 || lengthWithHeader > _maxMessageLength)
             {
-                throw new ArgumentException("Message length exceeds allowed value");
+                throw new ArgumentException("Message length exceeds allowed value", nameof(msgLength));
             }
 
             return BitConverter.GetBytes((ushort)(lengthWithHeader + ((int)type << 13)));
