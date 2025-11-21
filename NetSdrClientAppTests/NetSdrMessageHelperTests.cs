@@ -73,11 +73,11 @@ namespace NetSdrClientAppTests
 
             var samples = NetSdrMessageHelper.GetSamples(sampleSize, body).ToArray();
 
-            Assert.AreEqual(4, samples.Length);
-            Assert.AreEqual(1, samples[0]);
-            Assert.AreEqual(2, samples[1]);
-            Assert.AreEqual(3, samples[2]);
-            Assert.AreEqual(4, samples[3]);
+            Assert.That(samples.Length, Is.EqualTo(4));
+            Assert.That(samples[0], Is.EqualTo(1));
+            Assert.That(samples[1], Is.EqualTo(2));
+            Assert.That(samples[2], Is.EqualTo(3));
+            Assert.That(samples[3], Is.EqualTo(4));
         }
 
         [Test]
@@ -88,9 +88,9 @@ namespace NetSdrClientAppTests
 
             var samples = NetSdrMessageHelper.GetSamples(sampleSize, body).ToArray();
 
-            Assert.AreEqual(2, samples.Length);
-            Assert.AreEqual(1, samples[0]);
-            Assert.AreEqual(2, samples[1]);
+            Assert.That(samples.Length, Is.EqualTo(2));
+            Assert.That(samples[0], Is.EqualTo(1));
+            Assert.That(samples[1], Is.EqualTo(2));
         }
 
         [Test]
@@ -101,9 +101,9 @@ namespace NetSdrClientAppTests
 
             var samples = NetSdrMessageHelper.GetSamples(sampleSize, body).ToArray();
 
-            Assert.AreEqual(2, samples.Length);
-            Assert.AreEqual(BitConverter.ToInt32(new byte[] { 1, 2, 3, 0 }, 0), samples[0]);
-            Assert.AreEqual(BitConverter.ToInt32(new byte[] { 4, 5, 6, 0 }, 0), samples[1]);
+            Assert.That(samples.Length, Is.EqualTo(2));
+            Assert.That(samples[0], Is.EqualTo(BitConverter.ToInt32(new byte[] { 1, 2, 3, 0 }, 0)));
+            Assert.That(samples[1], Is.EqualTo(BitConverter.ToInt32(new byte[] { 4, 5, 6, 0 }, 0)));
         }
 
         [Test]
@@ -116,6 +116,123 @@ namespace NetSdrClientAppTests
             {
                 NetSdrMessageHelper.GetSamples(sampleSize, body).ToArray();
             });
+        }
+
+        // ------------------- Additional coverage tests -------------------
+
+        [Test]
+        public void TranslateMessage_ControlItemMessage_Success()
+        {
+            // Arrange
+            byte[] msg = NetSdrMessageHelper.GetControlItemMessage(
+                NetSdrMessageHelper.MsgTypes.SetControlItem,
+                NetSdrMessageHelper.ControlItemCodes.ReceiverFrequency,
+                new byte[] { 0xFF, 0xEE }
+            );
+
+            // Act
+            bool result = NetSdrMessageHelper.TranslateMessage(msg, 
+                out var type, out var code, out var seqNum, out var body);
+
+            // Assert
+            Assert.That(result, Is.True);
+            Assert.That(type, Is.EqualTo(NetSdrMessageHelper.MsgTypes.SetControlItem));
+            Assert.That(code, Is.EqualTo(NetSdrMessageHelper.ControlItemCodes.ReceiverFrequency));
+            Assert.That(body, Is.EqualTo(new byte[] { 0xFF, 0xEE }));
+        }
+
+        [Test]
+        public void TranslateMessage_DataItemMessage_Success()
+        {
+            // Arrange
+            byte[] msg = NetSdrMessageHelper.GetDataItemMessage(
+                NetSdrMessageHelper.MsgTypes.DataItem0,
+                new byte[] { 0x11, 0x22 }
+            );
+
+            // Act
+            bool result = NetSdrMessageHelper.TranslateMessage(msg,
+                out var type, out var code, out var seqNum, out var body);
+
+            // Assert
+            Assert.That(result, Is.True);
+            Assert.That(type, Is.EqualTo(NetSdrMessageHelper.MsgTypes.DataItem0));
+            Assert.That(code, Is.EqualTo(NetSdrMessageHelper.ControlItemCodes.None));
+            Assert.That(seqNum, Is.Not.EqualTo(0));
+        }
+
+        [Test]
+        public void GetSamples_EmptyBody_ReturnsEmpty()
+        {
+            // Arrange
+            byte[] body = Array.Empty<byte>();
+
+            // Act
+            var samples = NetSdrMessageHelper.GetSamples(8, body).ToArray();
+
+            // Assert
+            Assert.That(samples.Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void GetSamples_For32bitSamples()
+        {
+            // Arrange
+            byte[] body = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+
+            // Act
+            var samples = NetSdrMessageHelper.GetSamples(32, body).ToArray();
+
+            // Assert
+            Assert.That(samples.Length, Is.EqualTo(2));
+            Assert.That(samples[0], Is.EqualTo(BitConverter.ToInt32(new byte[] { 0x01, 0x02, 0x03, 0x04 }, 0)));
+            Assert.That(samples[1], Is.EqualTo(BitConverter.ToInt32(new byte[] { 0x05, 0x06, 0x07, 0x08 }, 0)));
+        }
+
+        [Test]
+        public void TranslateMessage_InvalidItemCode()
+        {
+            // Arrange: Create a message with an invalid control item code
+            byte[] msg = new byte[]
+            {
+                0x04, 0x00,  // Header: type=0 (SetControlItem), length=4
+                0xFF, 0xFF   // Invalid control item code
+            };
+
+            // Act
+            bool result = NetSdrMessageHelper.TranslateMessage(msg,
+                out var type, out var code, out var seqNum, out var body);
+
+            // Assert
+            Assert.That(result, Is.False);
+        }
+
+        [Test]
+        public void GetControlItemMessage_AllMsgTypes()
+        {
+            var controlTypes = new[]
+            {
+                NetSdrMessageHelper.MsgTypes.SetControlItem,
+                NetSdrMessageHelper.MsgTypes.CurrentControlItem,
+                NetSdrMessageHelper.MsgTypes.ControlItemRange,
+                NetSdrMessageHelper.MsgTypes.Ack
+            };
+
+            foreach (var type in controlTypes)
+            {
+                // Act
+                byte[] msg = NetSdrMessageHelper.GetControlItemMessage(
+                    type,
+                    NetSdrMessageHelper.ControlItemCodes.ReceiverFrequency,
+                    new byte[] { 0x01, 0x02 }
+                );
+
+                // Assert
+                Assert.That(msg.Length, Is.GreaterThan(0));
+                var num = BitConverter.ToUInt16(msg.Take(2).ToArray());
+                var actualType = (NetSdrMessageHelper.MsgTypes)(num >> 13);
+                Assert.That(actualType, Is.EqualTo(type));
+            }
         }
     }
 }
