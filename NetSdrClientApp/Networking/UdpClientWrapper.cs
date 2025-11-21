@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NetSdrClientApp.Networking;
 
-public class UdpClientWrapper : IUdpClient
+public partial class UdpClientWrapper : IUdpClient, IDisposable
 {
     private readonly IPEndPoint _localEndPoint;
     private CancellationTokenSource? _cts;
@@ -89,5 +89,22 @@ public class UdpClientWrapper : IUdpClient
         var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(payload));
 
         return BitConverter.ToInt32(hash, 0);
+    }
+}
+
+public partial class UdpClientWrapper
+{
+    public void Dispose()
+    {
+        try
+        {
+            StopInternal();
+        }
+        catch
+        {
+            // best-effort cleanup
+        }
+
+        GC.SuppressFinalize(this);
     }
 }

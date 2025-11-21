@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace NetSdrClientApp.Networking
 {
-    public class TcpClientWrapper : ITcpClient
+    public partial class TcpClientWrapper : ITcpClient, IDisposable
     {
         private readonly string _host;
         private readonly int _port;
@@ -147,6 +147,21 @@ namespace NetSdrClientApp.Networking
                 throw new InvalidOperationException("Not connected to a server.");
             }
         }
+        
+        public void Dispose()
+        {
+            try
+            {
+                Disconnect();
+            }
+            catch
+            {
+                // swallow - best-effort cleanup
+            }
+
+            GC.SuppressFinalize(this);
+        }
     }
 
 }
+
