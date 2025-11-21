@@ -100,7 +100,7 @@ namespace NetSdrClientApp.Networking
             if (Connected && _stream != null && _stream.CanWrite)
             {
                 Console.WriteLine($"Message sent: {BitConverter.ToString(data)}");
-                await _stream.WriteAsync(data, 0, data.Length);
+                await _stream.WriteAsync(data.AsMemory(), CancellationToken.None);
             }
             else
             {
@@ -122,7 +122,8 @@ namespace NetSdrClientApp.Networking
                 while (!_cts!.Token.IsCancellationRequested)
                 {
                     byte[] buffer = new byte[8194];
-                    int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length, _cts.Token);
+
+                    int bytesRead = await _stream.ReadAsync(buffer.AsMemory(), _cts.Token);
 
                     if (bytesRead > 0)
                     {

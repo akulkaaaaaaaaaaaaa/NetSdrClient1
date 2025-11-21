@@ -46,11 +46,14 @@ namespace EchoTspServer
 
         public void Stop()
         {
-            if (_disposed) return;
+            // Stop must be idempotent (safe to call many times)
+            if (_cts.IsCancellationRequested)
+                return;
 
             _cts.Cancel();
             _listener.Stop();
         }
+
 
         protected virtual void Dispose(bool disposing)
         {

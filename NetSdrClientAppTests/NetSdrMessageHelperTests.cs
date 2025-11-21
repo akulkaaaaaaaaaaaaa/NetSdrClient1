@@ -241,5 +241,36 @@ namespace NetSdrClientAppTests
                 });
             }
         }
+        
+        
+        [Test]
+        public void TranslateMessage_Fails_WhenBodyLengthDoesNotMatchHeaderLength()
+        {
+            // Header says length = 4, but total msg length is 3 → invalid!
+            byte[] msg = { 0x04, 0x04, 0x00 };
+
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+            {
+                NetSdrMessageHelper.TranslateMessage(msg,
+                    out _, out _, out _, out _);
+            });
+        }
+
+
+        [Test]
+        public void GetSamples_Throws_WhenSampleSizeNotDivisibleBy8()
+        {
+            byte[] body = { 1, 2, 3, 4 };
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                NetSdrMessageHelper.GetSamples(12, body).ToArray()); // 12 bits is invalid here
+        }
+
+        [Test]
+        public void GetSamples_Throws_WhenSampleSizeLessThan8()
+        {
+            byte[] body = { 1, 2, 3, 4 };
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                NetSdrMessageHelper.GetSamples(0, body).ToArray());
+        }
     }
 }
