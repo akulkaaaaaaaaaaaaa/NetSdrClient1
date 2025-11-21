@@ -11,14 +11,16 @@ namespace NetSdrClientAppTests
         public void TcpClientWrapper_SendMessage_Throws_WhenNotConnected()
         {
             var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
-            Assert.ThrowsAsync<InvalidOperationException>(async () => await wrapper.SendMessageAsync(new byte[] { 1, 2, 3 }));
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await wrapper.SendMessageAsync(new byte[] { 1, 2, 3 }));
         }
 
         [Test]
         public void TcpClientWrapper_SendString_Throws_WhenNotConnected()
         {
             var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
-            Assert.ThrowsAsync<InvalidOperationException>(async () => await wrapper.SendMessageAsync("hello"));
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await wrapper.SendMessageAsync("hello"));
         }
 
         [Test]
@@ -31,7 +33,6 @@ namespace NetSdrClientAppTests
         [Test]
         public void TcpClientWrapper_Connect_Disconnect_AreSafe()
         {
-            // Avoid blocking on a real network connect. Only ensure Disconnect is safe to call
             var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
             Assert.DoesNotThrow(() => wrapper.Disconnect());
         }
@@ -41,18 +42,18 @@ namespace NetSdrClientAppTests
         {
             var wrapper = new UdpClientWrapper(65001);
 
-            // Start listening in the background so the test doesn't block waiting for network IO.
             var listeningTask = Task.Run(() => wrapper.StartListeningAsync());
 
-            // Allow the listener to start briefly, then stop it.
             await Task.Delay(100);
             wrapper.StopListening();
 
-            // Wait for the listener to exit, but don't wait forever.
             var finished = await Task.WhenAny(listeningTask, Task.Delay(2000));
-            Assert.That(finished, Is.Not.Null);
-            // Ensure Stop/Exit are safe to call repeatedly
-            Assert.DoesNotThrow(() => wrapper.Exit());
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(finished, Is.Not.Null);
+                Assert.DoesNotThrow(() => wrapper.Exit());
+            });
         }
 
         [Test]
@@ -60,6 +61,7 @@ namespace NetSdrClientAppTests
         {
             var wrapper = new UdpClientWrapper(65002);
             var hash = wrapper.GetHashCode();
+
             Assert.That(hash, Is.TypeOf<int>());
         }
 
@@ -77,7 +79,6 @@ namespace NetSdrClientAppTests
             var receivedTcs = new TaskCompletionSource<byte[]>();
             wrapper.MessageReceived += (_, data) => receivedTcs.TrySetResult(data);
 
-            // Connect will trigger the listener Accept
             wrapper.Connect();
 
             using var serverClient = await acceptTask;
@@ -88,19 +89,26 @@ namespace NetSdrClientAppTests
             await wrapper.SendMessageAsync(sent);
 
             var buffer = new byte[sent.Length];
-            var read = await serverStream.ReadAsync(buffer, 0, buffer.Length);
-            Assert.That(read, Is.EqualTo(sent.Length));
-            Assert.That(buffer, Is.EqualTo(sent));
+            var read = await serverStream.ReadAsync(buffer.AsMemory(), default);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(read, Is.EqualTo(sent.Length));
+                Assert.That(buffer, Is.EqualTo(sent));
+            });
 
             // Test server->wrapper MessageReceived
             var serverToClient = new byte[] { 9, 8, 7 };
-            await serverStream.WriteAsync(serverToClient, 0, serverToClient.Length);
+            await serverStream.WriteAsync(serverToClient.AsMemory(), default);
 
             var finished = await Task.WhenAny(receivedTcs.Task, Task.Delay(2000));
-            Assert.That(finished, Is.EqualTo(receivedTcs.Task));
-            Assert.That(receivedTcs.Task.Result, Is.EqualTo(serverToClient));
 
-            // Cleanup
+            Assert.Multiple(() =>
+            {
+                Assert.That(finished, Is.EqualTo(receivedTcs.Task));
+                Assert.That(receivedTcs.Task.Result, Is.EqualTo(serverToClient));
+            });
+
             wrapper.Disconnect();
             listener.Stop();
         }
@@ -132,8 +140,12 @@ namespace NetSdrClientAppTests
             await sender.SendAsync(payload, payload.Length, "127.0.0.1", port);
 
             var finished = await Task.WhenAny(tcs.Task, Task.Delay(2000));
-            Assert.That(finished, Is.EqualTo(tcs.Task));
-            Assert.That(tcs.Task.Result, Is.EqualTo(payload));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(finished, Is.EqualTo(tcs.Task));
+                Assert.That(tcs.Task.Result, Is.EqualTo(payload));
+            });
 
             wrapper.StopListening();
             await Task.WhenAny(listeningTask, Task.Delay(500));

@@ -5,106 +5,125 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using NetSdrClientApp.Networking;
 
-public partial class UdpClientWrapper : IUdpClient, IDisposable
+namespace NetSdrClientApp.Networking
 {
-    private readonly IPEndPoint _localEndPoint;
-    private CancellationTokenSource? _cts;
-    private UdpClient? _udpClient;
-
-    public event EventHandler<byte[]>? MessageReceived;
-
-    public UdpClientWrapper(int port)
+    public sealed partial class UdpClientWrapper : IUdpClient, IDisposable
     {
-        _localEndPoint = new IPEndPoint(IPAddress.Any, port);
-    }
+        private readonly IPEndPoint _localEndPoint;
+        private CancellationTokenSource? _cts;
+        private UdpClient? _udpClient;
+        private bool _disposed;
 
-    public async Task StartListeningAsync()
-    {
-        _cts = new CancellationTokenSource();
-        Console.WriteLine("Start listening for UDP messages...");
+        public event EventHandler<byte[]>? MessageReceived;
 
-        try
+        public UdpClientWrapper(int port)
         {
-            _udpClient = new UdpClient(_localEndPoint);
-            while (!_cts.Token.IsCancellationRequested)
-            {
-                UdpReceiveResult result = await _udpClient.ReceiveAsync(_cts.Token);
-                MessageReceived?.Invoke(this, result.Buffer);
+            _localEndPoint = new IPEndPoint(IPAddress.Any, port);
+        }
 
-                Console.WriteLine($"Received from {result.RemoteEndPoint}");
+        public async Task StartListeningAsync()
+        {
+            ThrowIfDisposed();
+
+            _cts = new CancellationTokenSource();
+            Console.WriteLine("Start listening for UDP messages...");
+
+            try
+            {
+                _udpClient = new UdpClient(_localEndPoint);
+
+                while (!_cts.Token.IsCancellationRequested)
+                {
+                    UdpReceiveResult result = await _udpClient.ReceiveAsync(_cts.Token);
+                    MessageReceived?.Invoke(this, result.Buffer);
+
+                    Console.WriteLine($"Received from {result.RemoteEndPoint}");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // expected on Stop
+            }
+            catch (ObjectDisposedException)
+            {
+                // disposed concurrently — ignore
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error receiving message: {ex.Message}");
             }
         }
-        catch (OperationCanceledException)
+
+        private void StopInternal()
         {
-            // cancellation requested — expected on Stop
+            try
+            {
+                _cts?.Cancel();
+                _udpClient?.Close();
+                _cts?.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+                // already cleaned up in parallel shutdown
+            }
+            finally
+            {
+                _udpClient = null;
+                _cts = null;
+                Console.WriteLine("Stopped listening for UDP messages.");
+            }
         }
-        catch (ObjectDisposedException)
+
+        public void StopListening() => StopInternal();
+
+        public void Exit() => StopInternal();
+
+        public override int GetHashCode()
         {
-            // token/source disposed while receiving — ignore as shutdown race
+            var payload = $"{nameof(UdpClientWrapper)}|{_localEndPoint.Address}|{_localEndPoint.Port}";
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
+            return BitConverter.ToInt32(hash, 0);
         }
-        catch (Exception ex)
+
+        public override bool Equals(object? obj)
         {
-            Console.WriteLine($"Error receiving message: {ex.Message}");
+            if (ReferenceEquals(this, obj))
+                return true;
+
+            if (obj is not UdpClientWrapper other)
+                return false;
+
+            return _localEndPoint.Address.Equals(other._localEndPoint.Address)
+                && _localEndPoint.Port == other._localEndPoint.Port;
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(UdpClientWrapper));
         }
     }
 
-    private void StopInternal()
+    public sealed partial class UdpClientWrapper
     {
-        try
+        private void Dispose(bool disposing)
         {
-            _cts?.Cancel();
-            _udpClient?.Close();
-            _cts?.Dispose();
-            _cts = null;
-            Console.WriteLine("Stopped listening for UDP messages.");
-        }
-        catch (ObjectDisposedException)
-        {
-            // already disposed — ignore
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error while stopping: {ex.Message}");
-        }
-    }
+            if (_disposed)
+                return;
 
-    public void StopListening()
-    {
-        StopInternal();
-    }
+            _disposed = true;
 
-    public void Exit()
-    {
-        StopInternal();
-    }
-
-    public override int GetHashCode()
-    {
-        var payload = $"{nameof(UdpClientWrapper)}|{_localEndPoint.Address}|{_localEndPoint.Port}";
-
-        // Use SHA256 instead of MD5 (MD5 flagged as insecure). We only need a deterministic int.
-        using var sha = SHA256.Create();
-        var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(payload));
-
-        return BitConverter.ToInt32(hash, 0);
-    }
-}
-
-public partial class UdpClientWrapper
-{
-    public void Dispose()
-    {
-        try
-        {
-            StopInternal();
-        }
-        catch
-        {
-            // best-effort cleanup
+            if (disposing)
+            {
+                StopInternal();
+            }
         }
 
-        GC.SuppressFinalize(this);
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
     }
 }

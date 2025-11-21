@@ -8,9 +8,7 @@ namespace NetSdrClientAppTests
     public class NetSdrMessageHelperTests
     {
         [SetUp]
-        public void Setup()
-        {
-        }
+        public void Setup() { }
 
         [Test]
         public void GetControlItemMessageTest()
@@ -36,7 +34,7 @@ namespace NetSdrClientAppTests
             Assert.Multiple(() =>
             {
                 Assert.That(headerBytes.ToArray(), Has.Length.EqualTo(2));
-                Assert.That(msg.Length, Is.EqualTo(actualLength));
+                Assert.That(msg, Has.Length.EqualTo(actualLength));
                 Assert.That(type, Is.EqualTo(actualType));
                 Assert.That(actualCode, Is.EqualTo((short)code));
                 Assert.That(parametersBytes.ToArray(), Has.Length.EqualTo(parametersLength));
@@ -64,13 +62,14 @@ namespace NetSdrClientAppTests
             Assert.Multiple(() =>
             {
                 Assert.That(headerBytes.ToArray(), Has.Length.EqualTo(2));
-                Assert.That(msg.Length, Is.EqualTo(actualLength));
+                Assert.That(msg, Has.Length.EqualTo(actualLength));
                 Assert.That(type, Is.EqualTo(actualType));
                 Assert.That(parametersBytes.ToArray(), Has.Length.EqualTo(parametersLength));
             });
         }
 
-        // ------------------- Тести для GetSamples -------------------
+        // ------------------- Tests for GetSamples -------------------
+
         [Test]
         public void GetSamples_ReturnsCorrectValues_For8bitSamples()
         {
@@ -133,23 +132,20 @@ namespace NetSdrClientAppTests
             });
         }
 
-        // ------------------- Additional coverage tests -------------------
+        // ------------------- Extra coverage tests -------------------
 
         [Test]
         public void TranslateMessage_ControlItemMessage_Success()
         {
-            // Arrange
             byte[] msg = NetSdrMessageHelper.GetControlItemMessage(
                 NetSdrMessageHelper.MsgTypes.SetControlItem,
                 NetSdrMessageHelper.ControlItemCodes.ReceiverFrequency,
                 new byte[] { 0xFF, 0xEE }
             );
 
-            // Act
-            bool result = NetSdrMessageHelper.TranslateMessage(msg, 
+            bool result = NetSdrMessageHelper.TranslateMessage(msg,
                 out var type, out var code, out var seqNum, out var body);
 
-            // Assert
             Assert.Multiple(() =>
             {
                 Assert.That(result, Is.True);
@@ -162,17 +158,14 @@ namespace NetSdrClientAppTests
         [Test]
         public void TranslateMessage_DataItemMessage_Success()
         {
-            // Arrange
             byte[] msg = NetSdrMessageHelper.GetDataItemMessage(
                 NetSdrMessageHelper.MsgTypes.DataItem0,
                 new byte[] { 0x11, 0x22 }
             );
 
-            // Act
             bool result = NetSdrMessageHelper.TranslateMessage(msg,
                 out var type, out var code, out var seqNum, out var body);
 
-            // Assert
             Assert.Multiple(() =>
             {
                 Assert.That(result, Is.True);
@@ -185,26 +178,18 @@ namespace NetSdrClientAppTests
         [Test]
         public void GetSamples_EmptyBody_ReturnsEmpty()
         {
-            // Arrange
-            byte[] body = Array.Empty<byte>();
+            var samples = NetSdrMessageHelper.GetSamples(8, Array.Empty<byte>()).ToArray();
 
-            // Act
-            var samples = NetSdrMessageHelper.GetSamples(8, body).ToArray();
-
-            // Assert
             Assert.That(samples, Has.Length.EqualTo(0));
         }
 
         [Test]
         public void GetSamples_For32bitSamples()
         {
-            // Arrange
             byte[] body = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
 
-            // Act
             var samples = NetSdrMessageHelper.GetSamples(32, body).ToArray();
 
-            // Assert
             Assert.Multiple(() =>
             {
                 Assert.That(samples, Has.Length.EqualTo(2));
@@ -216,18 +201,15 @@ namespace NetSdrClientAppTests
         [Test]
         public void TranslateMessage_InvalidItemCode()
         {
-            // Arrange: Create a message with an invalid control item code
-            byte[] msg = new byte[]
+            byte[] msg =
             {
-                0x04, 0x00,  // Header: type=0 (SetControlItem), length=4
-                0xFF, 0xFF   // Invalid control item code
+                0x04, 0x00, // Header
+                0xFF, 0xFF  // Invalid item code
             };
 
-            // Act
             bool result = NetSdrMessageHelper.TranslateMessage(msg,
                 out var type, out var code, out var seqNum, out var body);
 
-            // Assert
             Assert.That(result, Is.False);
         }
 
@@ -244,17 +226,15 @@ namespace NetSdrClientAppTests
 
             foreach (var type in controlTypes)
             {
-                // Act
                 byte[] msg = NetSdrMessageHelper.GetControlItemMessage(
                     type,
                     NetSdrMessageHelper.ControlItemCodes.ReceiverFrequency,
                     new byte[] { 0x01, 0x02 }
                 );
 
-                // Assert
                 Assert.Multiple(() =>
                 {
-                    Assert.That(msg.Length, Is.GreaterThan(0));
+                    Assert.That(msg, Has.Length.GreaterThan(0));
                     var num = BitConverter.ToUInt16(msg.Take(2).ToArray());
                     var actualType = (NetSdrMessageHelper.MsgTypes)(num >> 13);
                     Assert.That(actualType, Is.EqualTo(type));

@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -17,6 +15,8 @@ namespace NetSdrClientApp.Networking
         private TcpClient? _tcpClient;
         private NetworkStream? _stream;
         private CancellationTokenSource? _cts;
+
+        private bool _disposed;
 
         public bool Connected => _tcpClient != null && _tcpClient.Connected && _stream != null;
 
@@ -54,30 +54,33 @@ namespace NetSdrClientApp.Networking
 
         public void Disconnect()
         {
-            if (Connected)
-            {
-                try
-                {
-                    _cts?.Cancel();
-                    _stream?.Close();
-                    _tcpClient?.Close();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // ignore dispose races
-                }
-                finally
-                {
-                    try { _cts?.Dispose(); } catch { }
-                    _cts = null;
-                    _tcpClient = null;
-                    _stream = null;
-                    Console.WriteLine("Disconnected.");
-                }
-            }
-            else
+            if (!Connected)
             {
                 Console.WriteLine("No active connection to disconnect.");
+                return;
+            }
+
+            try
+            {
+                _cts?.Cancel();
+                _stream?.Close();
+                _tcpClient?.Close();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Ignore dispose races
+            }
+            finally
+            {
+                _cts?.Dispose();
+                _tcpClient?.Dispose();
+                _stream?.Dispose();
+
+                _cts = null;
+                _tcpClient = null;
+                _stream = null;
+
+                Console.WriteLine("Disconnected.");
             }
         }
 
@@ -96,8 +99,7 @@ namespace NetSdrClientApp.Networking
         {
             if (Connected && _stream != null && _stream.CanWrite)
             {
-                string hexString = string.Join(" ", data.Select(b => b.ToString("X2")));
-                Console.WriteLine($"Message sent: {hexString}");
+                Console.WriteLine($"Message sent: {BitConverter.ToString(data)}");
                 await _stream.WriteAsync(data, 0, data.Length);
             }
             else
@@ -108,60 +110,63 @@ namespace NetSdrClientApp.Networking
 
         private async Task StartListeningAsync()
         {
-            if (Connected && _stream != null && _stream.CanRead)
-            {
-                try
-                {
-                    Console.WriteLine($"Starting listening for incomming messages.");
-
-                    while (!_cts!.Token.IsCancellationRequested)
-                    {
-                        byte[] buffer = new byte[8194];
-
-                        int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length, _cts.Token);
-                        if (bytesRead > 0)
-                        {
-                            MessageReceived?.Invoke(this, buffer.AsSpan(0, bytesRead).ToArray());
-                        }
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    // cancellation — expected on disconnect
-                }
-                catch (ObjectDisposedException)
-                {
-                    // stream or token disposed during shutdown — ignore
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error in listening loop: {ex.Message}");
-                }
-                finally
-                {
-                    Console.WriteLine("Listener stopped.");
-                }
-            }
-            else
+            if (!(Connected && _stream != null && _stream.CanRead))
             {
                 throw new InvalidOperationException("Not connected to a server.");
             }
-        }
-        
-        public void Dispose()
-        {
+
             try
+            {
+                Console.WriteLine($"Starting listening for incoming messages.");
+
+                while (!_cts!.Token.IsCancellationRequested)
+                {
+                    byte[] buffer = new byte[8194];
+                    int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length, _cts.Token);
+
+                    if (bytesRead > 0)
+                    {
+                        MessageReceived?.Invoke(this, buffer.AsSpan(0, bytesRead).ToArray());
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when stopping
+            }
+            catch (ObjectDisposedException)
+            {
+                // Stream or token got disposed during shutdown
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in listening loop: {ex.Message}");
+            }
+            finally
+            {
+                Console.WriteLine("Listener stopped.");
+            }
+        }
+
+        // ************* DISPOSE PATTERN FIX *************
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            if (disposing)
             {
                 Disconnect();
             }
-            catch
-            {
-                // swallow - best-effort cleanup
-            }
+        }
 
+        public void Dispose()
+        {
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
     }
-
 }
-
