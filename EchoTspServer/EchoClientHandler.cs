@@ -14,11 +14,11 @@ namespace EchoTspServer
 
             while (!token.IsCancellationRequested)
             {
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length, token);
+                int read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), token);
                 if (read == 0)
                     break;
 
-                await stream.WriteAsync(buffer, 0, read, token);
+                await stream.WriteAsync(buffer.AsMemory(0, read), token);
             }
 
             client.Close();

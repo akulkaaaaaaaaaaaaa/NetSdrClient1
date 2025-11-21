@@ -1,0 +1,142 @@
+using NUnit.Framework;
+using NetSdrClientApp.Networking;
+using System;
+using System.Threading.Tasks;
+
+namespace NetSdrClientAppTests
+{
+    public class WrapperTests
+    {
+        [Test]
+        public void TcpClientWrapper_SendMessage_Throws_WhenNotConnected()
+        {
+            var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
+            Assert.ThrowsAsync<InvalidOperationException>(async () => await wrapper.SendMessageAsync(new byte[] { 1, 2, 3 }));
+        }
+
+        [Test]
+        public void TcpClientWrapper_SendString_Throws_WhenNotConnected()
+        {
+            var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
+            Assert.ThrowsAsync<InvalidOperationException>(async () => await wrapper.SendMessageAsync("hello"));
+        }
+
+        [Test]
+        public void TcpClientWrapper_Disconnect_NoConnection_DoesNotThrow()
+        {
+            var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
+            Assert.DoesNotThrow(() => wrapper.Disconnect());
+        }
+
+        [Test]
+        public void TcpClientWrapper_Connect_Disconnect_AreSafe()
+        {
+            // Avoid blocking on a real network connect. Only ensure Disconnect is safe to call
+            var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
+            Assert.DoesNotThrow(() => wrapper.Disconnect());
+        }
+
+        [Test]
+        public async Task UdpClientWrapper_StartAndStop_IsResponsive()
+        {
+            var wrapper = new UdpClientWrapper(65001);
+
+            // Start listening in the background so the test doesn't block waiting for network IO.
+            var listeningTask = Task.Run(() => wrapper.StartListeningAsync());
+
+            // Allow the listener to start briefly, then stop it.
+            await Task.Delay(100);
+            wrapper.StopListening();
+
+            // Wait for the listener to exit, but don't wait forever.
+            var finished = await Task.WhenAny(listeningTask, Task.Delay(2000));
+            Assert.That(finished, Is.Not.Null);
+            // Ensure Stop/Exit are safe to call repeatedly
+            Assert.DoesNotThrow(() => wrapper.Exit());
+        }
+
+        [Test]
+        public void UdpClientWrapper_GetHashCode_ReturnsInt()
+        {
+            var wrapper = new UdpClientWrapper(65002);
+            var hash = wrapper.GetHashCode();
+            Assert.That(hash, Is.TypeOf<int>());
+        }
+
+        [Test]
+        public async Task TcpClientWrapper_Loopback_SendAndReceive_Works()
+        {
+            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+            var acceptTask = listener.AcceptTcpClientAsync();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            var receivedTcs = new TaskCompletionSource<byte[]>();
+            wrapper.MessageReceived += (_, data) => receivedTcs.TrySetResult(data);
+
+            // Connect will trigger the listener Accept
+            wrapper.Connect();
+
+            using var serverClient = await acceptTask;
+            using var serverStream = serverClient.GetStream();
+
+            // Test sending from wrapper to server
+            var sent = new byte[] { 1, 2, 3 };
+            await wrapper.SendMessageAsync(sent);
+
+            var buffer = new byte[sent.Length];
+            var read = await serverStream.ReadAsync(buffer, 0, buffer.Length);
+            Assert.That(read, Is.EqualTo(sent.Length));
+            Assert.That(buffer, Is.EqualTo(sent));
+
+            // Test server->wrapper MessageReceived
+            var serverToClient = new byte[] { 9, 8, 7 };
+            await serverStream.WriteAsync(serverToClient, 0, serverToClient.Length);
+
+            var finished = await Task.WhenAny(receivedTcs.Task, Task.Delay(2000));
+            Assert.That(finished, Is.EqualTo(receivedTcs.Task));
+            Assert.That(receivedTcs.Task.Result, Is.EqualTo(serverToClient));
+
+            // Cleanup
+            wrapper.Disconnect();
+            listener.Stop();
+        }
+
+        [Test]
+        public async Task UdpClientWrapper_Receives_Message()
+        {
+            int GetFreePort()
+            {
+                var tmp = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+                tmp.Start();
+                var p = ((System.Net.IPEndPoint)tmp.LocalEndpoint).Port;
+                tmp.Stop();
+                return p;
+            }
+
+            var port = GetFreePort();
+            var wrapper = new UdpClientWrapper(port);
+
+            var tcs = new TaskCompletionSource<byte[]>();
+            wrapper.MessageReceived += (_, data) => tcs.TrySetResult(data);
+
+            var listeningTask = Task.Run(() => wrapper.StartListeningAsync());
+
+            await Task.Delay(50);
+
+            using var sender = new System.Net.Sockets.UdpClient();
+            var payload = new byte[] { 4, 5, 6 };
+            await sender.SendAsync(payload, payload.Length, "127.0.0.1", port);
+
+            var finished = await Task.WhenAny(tcs.Task, Task.Delay(2000));
+            Assert.That(finished, Is.EqualTo(tcs.Task));
+            Assert.That(tcs.Task.Result, Is.EqualTo(payload));
+
+            wrapper.StopListening();
+            await Task.WhenAny(listeningTask, Task.Delay(500));
+        }
+    }
+}

@@ -12,7 +12,7 @@ namespace EchoTspServer
         private readonly string _host;
         private readonly int _port;
         private readonly UdpClient _udpClient;
-        private Timer _timer;
+        private Timer? _timer;
         private ushort _counter = 0;
 
         public UdpTimedSender(string host, int port)
@@ -30,7 +30,7 @@ namespace EchoTspServer
             _timer = new Timer(SendMessageCallback, null, 0, intervalMilliseconds);
         }
 
-        private void SendMessageCallback(object state)
+        private void SendMessageCallback(object? state)
         {
             try
             {
@@ -57,7 +57,7 @@ namespace EchoTspServer
         public void StopSending()
         {
             _timer?.Dispose();
-            _timer = null;
+            _timer = null!;
         }
 
         public void Dispose()

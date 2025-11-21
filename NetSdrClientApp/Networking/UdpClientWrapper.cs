@@ -5,8 +5,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using NetSdrClientApp.Networking;
 
-public class UdpClientWrapper : IUdpClient
+public partial class UdpClientWrapper : IUdpClient, IDisposable
 {
     private readonly IPEndPoint _localEndPoint;
     private CancellationTokenSource? _cts;
@@ -35,9 +36,13 @@ public class UdpClientWrapper : IUdpClient
                 Console.WriteLine($"Received from {result.RemoteEndPoint}");
             }
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
-            //empty
+            // cancellation requested — expected on Stop
+        }
+        catch (ObjectDisposedException)
+        {
+            // token/source disposed while receiving — ignore as shutdown race
         }
         catch (Exception ex)
         {
@@ -50,9 +55,14 @@ public class UdpClientWrapper : IUdpClient
         try
         {
             _cts?.Cancel();
-            _cts?.Dispose();
             _udpClient?.Close();
+            _cts?.Dispose();
+            _cts = null;
             Console.WriteLine("Stopped listening for UDP messages.");
+        }
+        catch (ObjectDisposedException)
+        {
+            // already disposed — ignore
         }
         catch (Exception ex)
         {
@@ -74,9 +84,27 @@ public class UdpClientWrapper : IUdpClient
     {
         var payload = $"{nameof(UdpClientWrapper)}|{_localEndPoint.Address}|{_localEndPoint.Port}";
 
-        using var md5 = MD5.Create();
-        var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(payload));
+        // Use SHA256 instead of MD5 (MD5 flagged as insecure). We only need a deterministic int.
+        using var sha = SHA256.Create();
+        var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(payload));
 
         return BitConverter.ToInt32(hash, 0);
+    }
+}
+
+public partial class UdpClientWrapper
+{
+    public void Dispose()
+    {
+        try
+        {
+            StopInternal();
+        }
+        catch
+        {
+            // best-effort cleanup
+        }
+
+        GC.SuppressFinalize(this);
     }
 }
