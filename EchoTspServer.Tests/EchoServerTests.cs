@@ -19,8 +19,8 @@ namespace EchoServerTests
 
             var fakeClient = new TcpClient();
 
-            // 1-й виклик → повертає клієнта
-            // 2-й виклик → завдання, яке ніколи не завершується (імітація очікування наступного клієнта)
+            // 1-й клієнт → нормальний
+            // 2-й зависає як реальний сервер (очікування наступних коннектів)
             listener.AcceptTcpClientAsync()
                 .Returns(
                     Task.FromResult(fakeClient),
@@ -30,32 +30,85 @@ namespace EchoServerTests
             var server = new EchoServer(listener, handler, logger);
 
             var serverTask = server.StartAsync();
-
-            // Даємо серверу стартанути
             await Task.Delay(50);
-
-            // Зупиняємо
             server.Stop();
-
-            // Чекаємо завершення або fallback по таймауту
             await Task.WhenAny(serverTask, Task.Delay(500));
 
-            // Перевіряємо що handler був викликаний 1 раз
             await handler.Received(1).HandleClientAsync(fakeClient, Arg.Any<CancellationToken>());
         }
 
         [Test, Timeout(2000)]
-
         public void Stop_DoesNotThrow_WhenCalledMultipleTimes()
         {
             var listener = Substitute.For<ITcpListener>();
-            var handler  = Substitute.For<IClientHandler>();
-            var logger   = Substitute.For<ILogger>();
+            var handler = Substitute.For<IClientHandler>();
+            var logger = Substitute.For<ILogger>();
 
             var server = new EchoServer(listener, handler, logger);
 
             Assert.DoesNotThrow(() => server.Stop());
             Assert.DoesNotThrow(() => server.Stop());
+        }
+
+        [Test, Timeout(2000)]
+        public void Stop_CallsListenerStop_IfConnected()
+        {
+            var listener = Substitute.For<ITcpListener>();
+            var handler = Substitute.For<IClientHandler>();
+            var logger = Substitute.For<ILogger>();
+
+            var server = new EchoServer(listener, handler, logger);
+            server.Stop();
+
+            listener.Received().Stop();
+        }
+
+        [Test, Timeout(2000)]
+        public void Dispose_CallsStop_AndDisposesResources()
+        {
+            var listener = Substitute.For<ITcpListener, IDisposable>();
+            var handler = Substitute.For<IClientHandler, IDisposable>();
+            var logger = Substitute.For<ILogger, IDisposable>();
+
+            var server = new EchoServer(listener, handler, logger);
+            server.Dispose();
+
+            listener.Received().Stop();
+            (listener as IDisposable)!.Received().Dispose();
+            (handler as IDisposable)!.Received().Dispose();
+            (logger as IDisposable)!.Received().Dispose();
+        }
+
+        [Test, Timeout(2000)]
+        public void Stop_Ignored_AfterDispose()
+        {
+            var listener = Substitute.For<ITcpListener>();
+            var handler = Substitute.For<IClientHandler>();
+            var logger = Substitute.For<ILogger>();
+
+            var server = new EchoServer(listener, handler, logger);
+            server.Dispose();
+            server.Stop();
+
+            listener.Received(1).Stop(); // тільки раз — через Dispose
+        }
+
+        [Test, Timeout(2000)]
+        public async Task StartAsync_IgnoresExceptions_FromListener()
+        {
+            var listener = Substitute.For<ITcpListener>();
+            var handler = Substitute.For<IClientHandler>();
+            var logger = Substitute.For<ILogger>();
+
+            listener.AcceptTcpClientAsync().Returns<Task<TcpClient>>(x => { throw new SocketException(); });
+
+            var server = new EchoServer(listener, handler, logger);
+            var task = server.StartAsync();
+
+            await Task.Delay(50);
+            server.Stop();
+
+            Assert.That(task.IsCompleted, Is.True);
         }
     }
 }

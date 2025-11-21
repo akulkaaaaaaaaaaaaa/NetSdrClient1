@@ -43,11 +43,11 @@ namespace NetSdrClientApp.Networking
             }
             catch (OperationCanceledException)
             {
-                // expected on Stop
+                // Expected due to StopListening or Exit
             }
             catch (ObjectDisposedException)
             {
-                // disposed concurrently — ignore
+                // Shutdown race condition ignored
             }
             catch (Exception ex)
             {
@@ -65,7 +65,7 @@ namespace NetSdrClientApp.Networking
             }
             catch (ObjectDisposedException)
             {
-                // already cleaned up in parallel shutdown
+                // Already disposed in parallel shutdown
             }
             finally
             {
@@ -100,8 +100,7 @@ namespace NetSdrClientApp.Networking
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(UdpClientWrapper));
+            ObjectDisposedException.ThrowIf(_disposed, nameof(UdpClientWrapper));
         }
     }
 
