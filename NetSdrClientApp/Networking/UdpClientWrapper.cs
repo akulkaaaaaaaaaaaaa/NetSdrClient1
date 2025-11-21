@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using NetSdrClientApp.Networking;
 
 public class UdpClientWrapper : IUdpClient
 {
@@ -35,7 +36,7 @@ public class UdpClientWrapper : IUdpClient
                 Console.WriteLine($"Received from {result.RemoteEndPoint}");
             }
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
             //empty
         }
