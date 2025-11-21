@@ -1,5 +1,7 @@
 using EchoTspServer;
 using NUnit.Framework;
+using System.Reflection;
+using System.Threading.Tasks;
 
 namespace EchoServerTests
 {
@@ -15,11 +17,12 @@ namespace EchoServerTests
         [Test]
         public void Main_HasCorrectSignature()
         {
-            var method = typeof(Program).GetMethod("Main");
+            // Act
+            MethodInfo? method = typeof(Program).GetMethod("Main");
 
+            // Assert
             Assert.IsNotNull(method, "Main method not found");
-            Assert.AreEqual(typeof(Task), method.ReturnType, "Main() must return Task");
+            Assert.That(method!.ReturnType, Is.EqualTo(typeof(Task)), "Main() must return Task");
         }
-        
     }
 }
