@@ -32,5 +32,31 @@ namespace EchoServerTests
 
             Assert.That(completed, Is.EqualTo(receiveTask), "No UDP packet received within timeout.");
         }
+        [Test]
+        public void StartSending_CalledTwice_Throws()
+        {
+            using var sender = new UdpTimedSender("127.0.0.1", 5000);
+            sender.StartSending(20);
+            Assert.Throws<InvalidOperationException>(() => sender.StartSending(20));
+        }
+        [Test]
+        public void StopSending_CanBeCalledMultipleTimes()
+        {
+            var sender = new UdpTimedSender("127.0.0.1", 5000);
+
+            sender.StartSending(20);
+            Assert.DoesNotThrow(() => sender.StopSending());
+            Assert.DoesNotThrow(() => sender.StopSending()); // повторний Stop
+        }
+
+        [Test]
+        public void Dispose_ReleasesResources_AndCanBeCalledTwice()
+        {
+            var sender = new UdpTimedSender("127.0.0.1", 5000);
+
+            Assert.DoesNotThrow(() => sender.Dispose());
+            Assert.DoesNotThrow(() => sender.Dispose()); // повторний Dispose
+        }
+        
     }
 }
