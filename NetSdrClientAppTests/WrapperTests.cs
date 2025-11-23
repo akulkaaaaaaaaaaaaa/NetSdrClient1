@@ -16,38 +16,47 @@ namespace NetSdrClientAppTests
         public void TcpClientWrapper_SendMessage_Throws_WhenNotConnected()
         {
             var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
-            Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await wrapper.SendMessageAsync(new byte[] { 1, 2, 3 }));
+
+            Assert.That(
+                async () => await wrapper.SendMessageAsync(new byte[] { 1, 2, 3 }),
+                Throws.InvalidOperationException
+            );
         }
 
         [Test]
         public void TcpClientWrapper_SendString_Throws_WhenNotConnected()
         {
             var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
-            Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await wrapper.SendMessageAsync("hello"));
+
+            Assert.That(
+                async () => await wrapper.SendMessageAsync("hello"),
+                Throws.InvalidOperationException
+            );
         }
 
         [Test]
         public void TcpClientWrapper_Disconnect_NoConnection_DoesNotThrow()
         {
             var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
-            Assert.DoesNotThrow(() => wrapper.Disconnect());
+
+            Assert.That(() => wrapper.Disconnect(), Throws.Nothing);
         }
 
         [Test]
         public void TcpClientWrapper_Connect_InvalidHost_DoesNotThrow()
         {
             var wrapper = new TcpClientWrapper("999.999.999.999", 65000);
-            Assert.DoesNotThrow(() => wrapper.Connect()); // Connect handles exception internally
+
+            Assert.That(() => wrapper.Connect(), Throws.Nothing);
         }
 
         [Test]
         public void TcpClientWrapper_Dispose_CanBeCalledTwice()
         {
             var wrapper = new TcpClientWrapper("127.0.0.1", 65000);
-            Assert.DoesNotThrow(() => wrapper.Dispose());
-            Assert.DoesNotThrow(() => wrapper.Dispose());
+
+            Assert.That(() => wrapper.Dispose(), Throws.Nothing);
+            Assert.That(() => wrapper.Dispose(), Throws.Nothing);
         }
 
         [Test]
@@ -98,8 +107,6 @@ namespace NetSdrClientAppTests
             listener.Stop();
         }
 
-
-        // Test sending string after connection
         [Test]
         public async Task TcpClientWrapper_SendString_AfterConnect_Works()
         {
@@ -140,7 +147,7 @@ namespace NetSdrClientAppTests
             Assert.Multiple(() =>
             {
                 Assert.That(finished, Is.Not.Null);
-                Assert.DoesNotThrow(() => wrapper.Exit());
+                Assert.That(() => wrapper.Exit(), Throws.Nothing);
             });
         }
 
@@ -191,25 +198,25 @@ namespace NetSdrClientAppTests
         }
 
         [Test]
-        public void Equals_ShouldBehaveCorrectly()
+        public void UdpClientWrapper_Equals_ShouldBehaveCorrectly()
         {
             var a = new UdpClientWrapper(5001);
             var b = new UdpClientWrapper(5001);
             var c = new UdpClientWrapper(6001);
 
-            Assert.IsTrue(a.Equals(a));
-            Assert.IsTrue(a.Equals(b));
-            Assert.IsFalse(a.Equals(c));
-            Assert.IsFalse(a.Equals(null));
+            Assert.That(a.Equals(a), Is.True);
+            Assert.That(a.Equals(b), Is.True);
+            Assert.That(a.Equals(c), Is.False);
+            Assert.That(a.Equals(null), Is.False);
         }
 
         [Test]
-        public void Dispose_ShouldNotThrow_AndCanBeCalledTwice()
+        public void UdpClientWrapper_Dispose_ShouldNotThrow_AndCanBeCalledTwice()
         {
             var wrapper = new UdpClientWrapper(5001);
 
-            Assert.DoesNotThrow(() => wrapper.Dispose());
-            Assert.DoesNotThrow(() => wrapper.Dispose());
+            Assert.That(() => wrapper.Dispose(), Throws.Nothing);
+            Assert.That(() => wrapper.Dispose(), Throws.Nothing);
         }
     }
 }
