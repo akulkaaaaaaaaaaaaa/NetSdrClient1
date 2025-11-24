@@ -14,8 +14,13 @@ namespace EchoTspServer
         private readonly UdpClient _udpClient;
         private Timer? _timer;
         private ushort _counter = 0;
-
         private bool _disposed;
+
+        // 🔐 Безпечний статичний псевдовипадковий генератор
+        private static readonly Random _rnd = new Random();
+
+        // 📌 Спільний статичний заголовок
+        private static readonly byte[] Header = new byte[] { 0x04, 0x84 };
 
         public UdpTimedSender(string host, int port)
         {
@@ -36,23 +41,21 @@ namespace EchoTspServer
         {
             try
             {
-                var rnd = new Random();
                 var samples = new byte[1024];
-                rnd.NextBytes(samples);
+                _rnd.NextBytes(samples);
                 _counter++;
 
-                byte[] header = { 0x04, 0x84 };
-                byte[] msg = header
+                byte[] data = Header
                     .Concat(BitConverter.GetBytes(_counter))
                     .Concat(samples)
                     .ToArray();
 
                 var endpoint = new IPEndPoint(IPAddress.Parse(_host), _port);
-                _udpClient.Send(msg, msg.Length, endpoint);
+                _udpClient.Send(data, data.Length, endpoint);
             }
             catch
             {
-                // помилки нам не критичні в бекграунді
+                // Фонові помилки ігноруються
             }
         }
 
@@ -71,12 +74,9 @@ namespace EchoTspServer
 
             if (disposing)
             {
-                // звільняємо керовані ресурси
                 StopSending();
                 _udpClient.Dispose();
             }
-
-            // unmanaged resources — немає
         }
 
         public void Dispose()
