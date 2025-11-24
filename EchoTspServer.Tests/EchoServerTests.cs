@@ -110,5 +110,26 @@ namespace EchoServerTests
 
             Assert.That(task.IsCompleted, Is.True);
         }
+        [Test]
+        public async Task Program_RunLifecycle_NoExceptions()
+        {
+            var listener = new DefaultTcpListener(5000);
+            var handler = new EchoClientHandler();
+            var logger = new ConsoleLogger();
+            var server = new EchoServer(listener, handler, logger);
+
+            var serverTask = server.StartAsync();
+
+            using var sender = new UdpTimedSender("127.0.0.1", 60000);
+            sender.StartSending(50); // менший інтервал
+
+            await Task.Delay(200); // імітуємо роботу
+
+            Assert.That(() => sender.StopSending(), Throws.Nothing);
+            Assert.That(() => server.Stop(), Throws.Nothing);
+
+            await serverTask;
+        }
+
     }
 }
