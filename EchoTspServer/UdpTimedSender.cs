@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Threading;
 
 namespace EchoTspServer
@@ -16,10 +17,10 @@ namespace EchoTspServer
         private ushort _counter = 0;
         private bool _disposed;
 
-        // 🔐 Безпечний статичний псевдовипадковий генератор
-        private static readonly Random _rnd = new Random();
+        // 🔐 Криптографічно безпечний генератор (прибирає Sonar Warning)
+        private static readonly RandomNumberGenerator _rng = RandomNumberGenerator.Create();
 
-        // 📌 Спільний статичний заголовок
+        // 📌 Статичний заголовок
         private static readonly byte[] Header = new byte[] { 0x04, 0x84 };
 
         public UdpTimedSender(string host, int port)
@@ -42,7 +43,7 @@ namespace EchoTspServer
             try
             {
                 var samples = new byte[1024];
-                _rnd.NextBytes(samples);
+                _rng.GetBytes(samples);
                 _counter++;
 
                 byte[] data = Header
@@ -76,6 +77,7 @@ namespace EchoTspServer
             {
                 StopSending();
                 _udpClient.Dispose();
+                _rng.Dispose();
             }
         }
 
